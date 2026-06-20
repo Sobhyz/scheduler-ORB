@@ -93,17 +93,30 @@ Volcano runs a cycle of stages called **actions**, applying **plugins**
 
 ### Plugins (the decision rules)
 
-| Plugin | What it decides |
-|--------|-----------------|
-| `priority` | Rank by importance, then arrival, then ID |
-| `gang` | All-or-nothing grouping of a job's pods |
-| `drf` | Fairness across different resource types |
-| `proportion` | Per-queue fair share |
-| `binpack` | Tight packing onto nodes |
-| `sla` | Anti-starvation maximum wait limit |
+| Plugin | What it does |
+|--------|--------------|
+| `priority` | Who is more important (priority → arrival → ID) |
+| `gang` | All-or-nothing (all of a job's pods together, or none) |
+| `conformance` | Protect critical system pods (safety) |
+| `overcommit` | Allow a bit beyond strict capacity |
+| `drf` | Favor fewer-resource jobs + fairness across resource types |
+| `predicates` | Filter: can this job fit on this node? |
+| `proportion` | Fair share per queue (anti-hogging) |
+| `nodeorder` | Pick the best node for placement |
+| `binpack` | Pack tightly, leaving room for big jobs |
+| `sla` | Anti-starvation (force jobs waiting beyond the limit through) |
+
+The plugins fall into three kinds of work:
+
+- **Ordering** (who runs first): `priority`, `drf`, `gang`, `sla`
+- **Placement** (where it runs): `predicates`, `nodeorder`, `binpack`, `overcommit`
+- **Safety / fairness**: `conformance`, `proportion`
 
 Plugins are grouped into **tiers**; earlier tiers override later ones when rules
-conflict.
+conflict. The order *within* a tier matters only when two plugins decide the same
+kind of thing (for example, two ordering rules); plugins doing different jobs
+(such as `priority` and `gang`) can be listed in either order with the same
+result.
 
 ---
 
@@ -276,6 +289,46 @@ plugin introduced a rule that does not exist built-in.
 | Ordering by duration or area (resources × time) | Built-in plugins judge by resources and priority, never duration; DRF covers the resource dimension only | Custom Go plugin, **or** compute area before submission and map to priority classes |
 | Stopping jobs that exceed their declared time | Not a scheduler function | Per-job time limit |
 | Exact waiting-time prediction | Depends on live load | Only an upper bound (the SLA limit) can be guaranteed |
+
+### Writing a Custom Plugin (Go) — Brief Example
+
+A custom rule, such as ordering by area (resources × time), is not a
+configuration change — it is **Go code compiled into Volcano**. The rule lives in
+a function called `jobOrderFn`, which compares two jobs and decides which goes
+first. A minimal sketch:
+
+```go
+package area
+
+// the plugin compares two jobs by area = resources × time limit
+func (ap *areaPlugin) OnSessionOpen(ssn *framework.Session) {
+    ssn.AddJobOrderFn(ap.Name(), func(l, r interface{}) int {
+        jobL := l.(*api.JobInfo)
+        jobR := r.(*api.JobInfo)
+
+        areaL := totalResources(jobL) * timeLimit(jobL)
+        areaR := totalResources(jobR) * timeLimit(jobR)
+
+        if areaL < areaR {
+            return -1   // smaller area runs first
+        }
+        return 1
+    })
+}
+```
+
+The steps to use it:
+
+1. Write the plugin in Go (the function above).
+2. Register it in Volcano's plugin list in the source.
+3. Recompile Volcano into a new container image.
+4. Deploy that image to the cluster.
+5. Reference it by name in the config: `- name: area`.
+
+The config line `- name: area` does nothing unless the compiled Volcano binary
+contains this code. Because of this overhead, the **area-to-priority mapping
+shortcut** (computing area before submission and assigning a priority class) is
+usually preferred, as it needs no custom code.
 
 ---
 
