@@ -6,7 +6,7 @@ import pandas as pd
 
 # [1,2,3,4] -> [1,2]
 
-class Schedulerer:
+class Scheduler:
     totalMemory = 2048
     def __init__(self, jobsToConsider: int=-1, ageLimit: int = 1000):
         self.readyToServe = PriorityQueue()
@@ -44,11 +44,11 @@ class Schedulerer:
                 
     def remove_mem(self, val):
         with self.memLock:
-            Schedulerer.totalMemory -= val
+            Scheduler.totalMemory -= val
 
     def add_mem(self, val):
         with self.memLock:
-            Schedulerer.totalMemory += val
+            Scheduler.totalMemory += val
 
     def serve_jobs(self):
         while self.readyToServe:
@@ -56,7 +56,7 @@ class Schedulerer:
             with self.generalLock:
                 if not self.readyToServe.empty():
                     currJob = self.readyToServe.get(False)[1]
-                    if Schedulerer.totalMemory >= currJob.memoryRequired:
+                    if Scheduler.totalMemory >= currJob.memoryRequired:
                         self.remove_mem(currJob.memoryRequired)
                         
                         task = Thread(target=self.process_Job, args=[currJob,])
@@ -64,7 +64,7 @@ class Schedulerer:
 
                         # 
                         cnt+=1
-                        print(Schedulerer.totalMemory)
+                        print(Scheduler.totalMemory)
                         
                     else:
                         print(f"served {cnt}")
@@ -98,7 +98,7 @@ class Schedulerer:
         server.start()
 
 if __name__ == "__main__":
-    sched = Schedulerer(jobsToConsider=10)
+    sched = Scheduler(jobsToConsider=10)
     sched.recieve_jobs()
     mover = Thread(target = sched.move_jobs)
     server = Thread(target = sched.serve_jobs)
