@@ -1,5 +1,6 @@
 from time import time
 from threading import Thread
+from uuid import uuid4
 
 class Job:
     def __init__(self, timeRequired: int, numGpus: int, memoryRequired: int) -> None:
@@ -9,13 +10,14 @@ class Job:
         self.kill = False
         self.numGpus = numGpus
         self.memoryRequired = memoryRequired
+        self.uuid = uuid4()
 
-        self.ageUpdator = Thread(name = "Age Updator", target=self._update_age)
+        # self.ageUpdator = Thread(name = "Age Updator", target=self._update_age)
         
-
-    def _update_age(self) -> None:
-        while not self.kill:
-            self.age = time() - self.timeStamp
+    def __lt__(self, other):
+        return self.uuid < other.uuid
+    
+    
             # print(self.age, self._calculate_priority())
 
         # print("Killed")
