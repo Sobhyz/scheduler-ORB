@@ -68,7 +68,8 @@ class Scheduler:
 
                     if self.marker[currJob.uuid]: #if job already served then continue
                         continue
-                    if Schedulerer.totalMemory >= currJob.memoryRequired:
+
+                    if Scheduler.totalMemory >= currJob.memoryRequired:
                         
                         self._start_job(currJob)
 
@@ -116,7 +117,7 @@ class Scheduler:
             if self.marker[job.uuid]:
                 continue
 
-            if Schedulerer.totalMemory >= job.memoryRequired:
+            if Scheduler.totalMemory >= job.memoryRequired:
 
                 self._start_job(job)
                 print(job.memoryRequired, end=' ', flush=True)
