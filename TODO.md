@@ -1,6 +1,6 @@
 - [X] optimize priority updates.
-- [] backfill (gready)
-- [] backfill (dp)
-- [] remove age threads and make it update in intervals / figure a mathimatical equation
-- [] measurments
-- [] run experiments
+- [ ] backfill (gready)
+- [ ] backfill (dp)
+- [ ] remove age threads and make it update in intervals / figure a mathimatical equation
+- [ ] measurments
+- [ ] run experiments
