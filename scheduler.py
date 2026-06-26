@@ -21,6 +21,8 @@ class Scheduler:
         self.generalLock = Lock()
         self.memLock = Lock()
         self.df = pd.read_csv("./devicesDataSet.csv")
+        self.currentlyProcessing = []
+        
         
 
     def recieve_jobs(self) -> None:
@@ -78,7 +80,7 @@ class Scheduler:
                         print(Scheduler.totalMemory)
                         
                     else:
-                        self.backfill()
+                        self.backfill_greedy(currJob.memoryRequired)
                         if cnt >0:
                             print(f"served {cnt}")
                         self.readyToServe.put((currJob.calculate_priority(), currJob))
@@ -90,10 +92,12 @@ class Scheduler:
         sleep((currJob.timeRequired//10) + 1)
         self.add_mem(currJob.memoryRequired)
         currJob.kill_job()
+        self.currentlyProcessing.remove(currJob)
         print("Done")
 
     def _start_job(self, currJob):
         self.remove_mem(currJob.memoryRequired)
+        self.currentlyProcessing.append(currJob)
         self.marker[currJob.uuid] = True
         task = Thread(target=self.process_Job, args=[currJob,])
         task.start()
@@ -107,20 +111,40 @@ class Scheduler:
             if not self.marker[entry.uuid]:
                 self.readyToServe.put((entry.calculate_priority(), entry))
 
+    def _get_eta(self, nextMemRequired):
+        sorted(self.currentlyProcessing, key=lambda x: x.memoryRequired)
+        totalAvailableMemory = Scheduler.totalMemory
+        eta = 1e9
+        localEta=0
+        for job in self.currentlyProcessing:
+            totalAvailableMemory += job.memoryRequired
+            localEta = max(localEta, job.timeRequired )
 
-    def backfill(self) -> None: 
+            if totalAvailableMemory <=nextMemRequired:
+                eta = min(eta, localEta)
+                localEta = 0
+                totalAvailableMemory = Scheduler.totalMemory
+
+        return eta
+
+
+    def backfill_greedy(self, nextMemRequired) -> None: 
         # start with naive approach
         # tmp = [currJob for currJob in self.steveJobs] 
         sorted(self.steveJobs, key=lambda x: x.memoryRequired)
-
+        
+        eta = self._get_eta(nextMemRequired)
+        # if eta<1e9:
+            
         for job in self.steveJobs:
             if self.marker[job.uuid]:
                 continue
 
-            if Scheduler.totalMemory >= job.memoryRequired:
+            if Scheduler.totalMemory >= job.memoryRequired and job.timeRequired < eta and eta<1e9:
 
                 self._start_job(job)
-                print(job.memoryRequired, end=' ', flush=True)
+                print("ETA: ",eta)
+                print(f"time: {job.timeRequired} memory: {job.memoryRequired}")
 
             
 
